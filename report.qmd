@@ -93,12 +93,6 @@ topfeatures(dfm_db_grouped["neutral", ], 20)
 ```{r}
 #| label: sentiment
 #| output: false
-# TODO: SentiWS laden und als quanteda-dictionary aufbereiten,
-#       dann pro Dokument einen Sentiment-Score berechnen.
-# Alternativ: vorhandene Gold-Annotation (Spalte 'sentiment') als Vergleich
-#       gegen deinen lexikonbasierten Score nutzen. Das ist ein starkes
-#       Detail fürs Portfolio: du zeigst Validierung, nicht nur Anwendung.
-#| label: define-helper-functions
 
 extract_words <- function(lines) {
   parts <- strsplit(lines, "\t")
@@ -148,11 +142,6 @@ modell <- stm(stm_input$documents, stm_input$vocab,
 ```
 
 ## 7 Optionale Vertiefung
-
-Nur falls Zeit bleibt und es die Aussage stützt, nicht zum Auffüllen.
-
-* Wortvektoren (`text2vec`), um das semantische Umfeld eines kritischen Begriffs zu zeigen
-* Ko-Okkurrenz-Netzwerk häufiger Beschwerdebegriffe (`quanteda.textstats::fcm`, Visualisierung in Gephi)
 
 ```{r}
 library(quanteda.textplots)
