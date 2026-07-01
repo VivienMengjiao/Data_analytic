@@ -1,0 +1,170 @@
+---
+title: "Kundenfeedback zur Deutschen Bahn: Treiber negativer Stimmung"
+author: "Mengjiao Li"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    df-print: paged
+lang: de
+execute:
+  warning: false
+  message: false
+---
+
+
+## 1 Fragestellung und Kontext
+
+Dieser Bericht untersucht, welche Themen die negative Stimmung im Kundenfeedback zur Deutschen Bahn treiben und wie sie sich im Zeitverlauf verändern.
+
+
+
+## 2 Daten laden
+
+```{r}
+#| label: setup
+library(quanteda)
+library(quanteda.textstats)
+library(tidyverse)
+library(stm)
+
+
+
+raw <- readr::read_tsv("S:/Private/Job/Demo/train-2017-09-15.tsv",
+                       col_names = c("id", "text", "relevance",
+                                     "sentiment", "aspect","extra"))
+glimpse(raw)
+db_relevant<-raw |> filter(relevance) |> nrow()
+positive_count<-raw |> filter(raw$sentiment=="positive")|>nrow()
+positive_percentage<-positive_count/db_relevant
+zusammenfassung <- tibble(
+  gesamt_dokumente = nrow(raw),
+  relevante_dokumente = db_relevant,
+  positive_anteil = positive_percentage
+)
+zusammenfassung
+```
+Es gibt insgesamt 19432 Texte. 16201 davon sind relevant für Deusche Bahn. 72% der Sentiment，die relevant für DB sind, sind positive.
+
+
+## 3 Vorverarbeitung
+
+```{r}
+#| label: corpus
+#| output: false
+
+korpus <- raw |>
+  filter(relevance) |>      
+  corpus(text_field = "text")
+  eigene_stopwords <- c("rt","bitte", "re","+","-","ja","=","immer","ab","mal","gibt","s","gutefrage.net-tag","db")
+toks <- korpus |>
+  tokens(remove_punct = TRUE, remove_numbers = TRUE, remove_url = TRUE) |>
+  tokens_tolower() |>
+  tokens_remove(c(stopwords("de"),eigene_stopwords))
+
+dfm_db <- dfm(toks) |>
+  dfm_trim(min_termfreq = 15)
+
+
+```
+
+
+## 4 Deskriptive Übersicht
+
+```{r}
+#| label: descriptive
+
+topfeatures(dfm_db, 20)
+
+dfm_db_grouped <- dfm_group(dfm_db, groups = sentiment)
+head(dfm_db_grouped)
+topfeatures(dfm_db_grouped["negative", ], 20)
+topfeatures(dfm_db_grouped["positive", ], 20)
+topfeatures(dfm_db_grouped["neutral", ], 20)
+```
+
+
+
+## 5 Sentiment im Zeitverlauf
+
+
+```{r}
+#| label: sentiment
+#| output: false
+# TODO: SentiWS laden und als quanteda-dictionary aufbereiten,
+#       dann pro Dokument einen Sentiment-Score berechnen.
+# Alternativ: vorhandene Gold-Annotation (Spalte 'sentiment') als Vergleich
+#       gegen deinen lexikonbasierten Score nutzen. Das ist ein starkes
+#       Detail fürs Portfolio: du zeigst Validierung, nicht nur Anwendung.
+#| label: define-helper-functions
+
+extract_words <- function(lines) {
+  parts <- strsplit(lines, "\t")
+  main_words <- sapply(parts, function(x) sub("\\|.*", "", x[1]))
+  variants <- sapply(parts, function(x) if (length(x) >= 3) x[3] else "")
+  variant_words <- unlist(strsplit(variants, ","))
+  unique(tolower(c(main_words, variant_words)))
+}
+
+pos_words <- readLines("S:/Private/Job/Demo/SentiWS_v1.8c_Positive.txt", encoding = "UTF-8")
+neg_words <- readLines("S:/Private/Job/Demo/SentiWS_v1.8c_Negative.txt", encoding = "UTF-8")
+pos_dict_words <- extract_words(pos_words)
+neg_dict_words <- extract_words(neg_words)
+sentiws_dict <- dictionary(list(
+  positive = pos_dict_words,
+  negative = neg_dict_words))
+length(pos_dict_words)
+length(neg_dict_words)
+sentiment_counts <- dfm_lookup(dfm_db, dictionary = sentiws_dict)
+sentiment_df <- convert(sentiment_counts, to = "data.frame") |>
+  mutate(
+    sentiment_score = positive - negative,
+    lexikon_label = case_when(
+      sentiment_score > 0 ~ "positive",
+      sentiment_score < 0 ~ "negative",
+      TRUE ~ "neutral"
+    )
+  )
+library(ggplot2)
+ggplot(data=sentiment_df,aes(x=sentiment_score))+geom_histogram(bindwidth=1)
+```
+## 6 Structural Topic Modelling
+
+```{r}
+#|label: stm
+#|output: false
+library(stm)
+docvars(dfm_db)
+stm_input <- quanteda::convert(dfm_db, to = "stm")
+stm_input
+modell <- stm(stm_input$documents, stm_input$vocab,
+            K = 5,
+              data = stm_input$meta,
+              init.type = "Spectral")
+
+       labelTopics(modell, n = 8)
+```
+
+## 7 Optionale Vertiefung
+
+Nur falls Zeit bleibt und es die Aussage stützt, nicht zum Auffüllen.
+
+* Wortvektoren (`text2vec`), um das semantische Umfeld eines kritischen Begriffs zu zeigen
+* Ko-Okkurrenz-Netzwerk häufiger Beschwerdebegriffe (`quanteda.textstats::fcm`, Visualisierung in Gephi)
+
+```{r}
+library(quanteda.textplots)
+library(quanteda.textstats)
+
+top_words <- names(topfeatures(dfm_db, 50))
+
+fcm_db <- fcm(dfm_db) |>
+  fcm_select(pattern = top_words)
+
+textplot_network(fcm_db)
+```
+
+## 8 Fazit und Handlungsempfehlung
+
