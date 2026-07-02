@@ -204,10 +204,6 @@ modell <- stm(stm_input$documents, stm_input$vocab,
 
 ## 7 Optionale Vertiefung
 
-Nur falls Zeit bleibt und es die Aussage stützt, nicht zum Auffüllen.
-
-* Wortvektoren (`text2vec`), um das semantische Umfeld eines kritischen Begriffs zu zeigen
-* Ko-Okkurrenz-Netzwerk häufiger Beschwerdebegriffe (`quanteda.textstats::fcm`, Visualisierung in Gephi)
 
 ```{r}
 library(quanteda.textplots)
